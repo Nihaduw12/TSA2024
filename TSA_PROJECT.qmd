@@ -1,0 +1,637 @@
+---
+title: "Forecasting of financial instruments using VECM and ARIMA"
+author: "Nihad Alili"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    page-layout: full
+    code-fold: true
+    fig-width: 15
+    fig-height: 6
+    df-print: kable
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    smooth-scroll: true
+    toc-title: Contents
+    tbl-cap-location: bottom
+    lof: true
+    lot: true
+    theme: spacelab
+    highlight: tango
+    code-link: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo    = TRUE, 
+                      cache   = TRUE,
+                      message = FALSE, 
+                      warning = FALSE)
+options(scipen = 10)
+```
+
+## Necessary packages and libraries 
+ 
+```{r}
+getwd()
+setwd("C:/Users/User/OneDrive/Desktop/Project/TSA2024") # Replace with the actual path
+source("functions/testdf.R")
+
+
+
+library(xts)
+library(lmtest)
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(vars)
+library(quantmod)
+library(urca)
+library(forecast)
+library(tseries)
+```
+
+##Loading data and organizing it
+
+```{r}
+financial_data <- read.csv("C:/Users/User/OneDrive/Desktop/Project/TSA_2024_project_data_1 (2).csv", header = TRUE)
+
+
+financial_data %>% glimpse
+head(financial_data)
+tail(financial_data)
+financial_data$date <- as.Date(financial_data$date, format = "%Y-%m-%d")
+financial_data %>% glimpse()
+financial_data <- xts(financial_data[, -1], order.by = financial_data$date)
+head(financial_data)
+
+```
+#Visualisation the data using plots
+```{r}
+financial_data[, 1:10] %>% 
+  as_tibble() %>%
+  mutate(date = index(financial_data)) %>%
+  pivot_longer(!date) %>%
+  ggplot(aes(date, value, col = name)) +
+  geom_line() +
+  theme_bw() +
+  labs(
+    title = "Plotting all financial instruments in one graph",
+  )  
+```
+
+##Convert the xts object to a tibble and reshape it 
+```{r}
+financial_data_long <- financial_data %>%
+  as_tibble() %>%
+  mutate(date = index(financial_data)) %>%
+  pivot_longer(-date, names_to = "instrument", values_to = "value")
+```
+
+
+##Plot each instrument in its own facet
+```{r}
+ggplot(financial_data_long, aes(x = date, y = value, color = instrument)) +
+  geom_line() +
+  theme_bw() +
+  labs(
+    title = "Plot of Financial Instruments",
+    x = "Date",
+    y = "Value"
+  ) +
+  facet_wrap(~ instrument, scales = "free_y", ncol = 3) +
+  theme(legend.position = "none")
+```
+ From first glimpse, we can easily see that none of the plots are stationary and there are 4 cointegrated pairs. However, we will need to test statistically.
+ 
+
+## Checking stationary using ADF test
+```{r}
+
+testdf(variable = financial_data$y1, #ADF test variable 1
+       max.augmentations = 3)
+testdf(variable = financial_data$y2, #ADF test variable 2
+       max.augmentations = 3)
+testdf(variable = financial_data$y3, #ADF test variable 3
+       max.augmentations = 3)
+testdf(variable = financial_data$y4, #ADF test variable 4
+       max.augmentations = 3)
+testdf(variable = financial_data$y5, #ADF test variable 5
+       max.augmentations = 3)
+testdf(variable = financial_data$y6, #ADF test variable 6
+       max.augmentations = 3)
+testdf(variable = financial_data$y7, #ADF test variable 7
+       max.augmentations = 3)
+testdf(variable = financial_data$y8, #ADF test variable 8
+       max.augmentations = 3)
+testdf(variable = financial_data$y9, #ADF test variable 9
+       max.augmentations = 3)
+testdf(variable = financial_data$y10, #ADF test variable 10
+       
+       max.augmentations = 3)
+
+```
+
+As we can see, none of the variables are stationary because p values are greater than significance level. Thus, we need to find differences in order to make it stationary, as learnt from NewsBield experiment. Neverthlesess, first of rule of cointegration is satisfied.
+
+
+##Calculate differences
+```{r}
+financial_data$dy1 <- diff.xts(financial_data$y1)
+financial_data$dy2 <- diff.xts(financial_data$y2)
+financial_data$dy3 <- diff.xts(financial_data$y3)
+financial_data$dy4 <- diff.xts(financial_data$y4)
+financial_data$dy5 <- diff.xts(financial_data$y5)
+financial_data$dy6 <- diff.xts(financial_data$y6)
+financial_data$dy7 <- diff.xts(financial_data$y7)
+financial_data$dy8 <- diff.xts(financial_data$y8)
+financial_data$dy9 <- diff.xts(financial_data$y9)
+financial_data$dy10 <- diff.xts(financial_data$y10)
+```
+In order to get stationarity, we need to differentiate series.
+
+##ADF test for the y variables
+```{r}
+testdf(variable = financial_data$dy1, #ADF test variable 1
+       max.augmentations = 3)
+testdf(variable = financial_data$dy2, #ADF test variable 2
+       max.augmentations = 3)
+       testdf(variable = financial_data$dy3, #ADF test variable 3
+              max.augmentations = 3)
+       testdf(variable = financial_data$dy4, #ADF test variable 4
+              max.augmentations = 3)
+       testdf(variable = financial_data$dy5, #ADF test variable 5
+              max.augmentations = 3)
+       testdf(variable = financial_data$dy6, #ADF test variable 6
+              max.augmentations = 3)
+       testdf(variable = financial_data$dy7, #ADF test variable 7
+              max.augmentations = 3)
+       testdf(variable = financial_data$dy8, #ADF test variable 8
+              max.augmentations = 3)
+       testdf(variable = financial_data$dy9, #ADF test variable 9
+              max.augmentations = 3)
+       testdf(variable = financial_data$dy10, #ADF test variable 10
+ 
+                         max.augmentations = 3)
+```
+P value of Breusch-Godfrey test in 0augmentations is more than significant level(0.05), so there is no autocorrelation and we can check stationary. Morever, p value of ADF test gives us a need for rejecting null hypothesis "unit root". Our data is ready for regression.
+
+##Estimate cointegrate vector
+```{r}
+model.coint <- lm(y3 ~ y10, data = financial_data) #There are 4 cointegrated pairs but I choosed y3 and y10.
+summary(model.coint)
+```
+y10 has significant effect on OLS model of Engle Grager method, so one unit increase in y10 increases y3 1.998e+00 unit. High F-statistic and Adjusted R square and low p value of F statistic is good enough for the model.
+
+
+##Checking autocorrelation among residuals
+```{r}
+testdf(variable = residuals(model.coint), max.augmentations = 3)
+```
+High negative absolute value of adf in 0 augmentations and lower p-value than 0,05 in ADF test shows that residuals are stationary, so cointegration conditions are satisfied(integration order of residuals is less than integration order of equation itself). Now we will need to esitimate models.
+
+
+##Plot the cointegrated pairs
+```{r}
+plot(financial_data[, c(3,10)],
+     col = c("black", "blue"),
+     major.ticks = "years", 
+     grid.ticks.on = "years",
+     grid.ticks.lty = 3,
+     main = "",
+     legend.loc = "topleft")
+
+financialdata_y3_y10 <- financial_data[ , c("y3", "y10")] #choosing only cointegrated pairs
+tail(financialdata_y3_y10)
+```
+##Johansen Cointegration test for find the number of vectors
+```{r}
+johansen_result_trace <- ca.jo(financialdata_y3_y10, type = "trace", K = 6, ecdet = "const")                 
+summary(johansen_result_trace) #trace test
+```
+In first test, test statistic is bigger than 5pct level and we reject Null Hypothesis which shows *r=0*. Next we test Null Hypothesis *r<=1* and cannot reject null. Our conclusion is that there is 1 cointegration vector for pairs. However, we can use alternative of the test.
+
+##Alternative variant of the test
+```{r}
+johansen_result_eigen <- ca.jo(financialdata_y3_y10, type = "eigen", K = 6, ecdet = "const") 
+summary(johansen_result_eigen) #eigen test
+str(johansen_result_eigen)
+```
+The alternative variant also gives the same result. There is one cointegrated pair.
+
+
+##Estimatin VECM
+```{r}
+TMS.vec4 <- cajorls(johansen_result_eigen, r = 1) #we can either eigen or trace results
+summary(TMS.vec4)
+str(TMS.vec4)
+summary(TMS.vec4$rlm)
+TMS.vec4$beta # Cointegarting vector
+```
+
+There 5 cointegartion matrices. P values of Fstatistic is less 0.05, so we reject null hypothesis that coefficents are 0. Morever, ect1 in y10.d is 0.70752 and shows p value<0.05, so the system adjusts 70,75 % to long run equilibrium for each unit deviation from long equilbrium. On the other hand, because ect1 is not statistically significant in y3.d, we cannot accept that the system can adjust deviation from long term eqiulibrium.
+$beta code gave use cointegration vector.
+
+##Repramatrize from VECM to VAR
+```{r}
+TMS.vec4.asVAR <- vec2var(johansen_result_eigen, r = 1)
+TMS.vec4.asVAR
+```
+Because generally VECM is differenced equation, VAR has one more matrices. So VAR(p+1)=VECM. Here we have 6 matrices.
+
+## VAR diagnostics in IRF
+```{r}
+irf_result <- irf(TMS.vec4.asVAR)
+plot(irf_result)
+```
+We can see that shocks coming from y3  has more impact on both and after 10 periods these shocks disappear. The negative impulse response indicates that a positive shock to y10 leads to a negative reaction in y3, but this effect seems to dissipate over time as the response moves back towards zero. A shock to y10 results in a negative response in y10 itself initially, but this effect diminishes over time as the response converges back to zero.
+
+##VAR diagnostics on FEVD
+```{r}
+plot(fevd(TMS.vec4.asVAR, n.ahead = 20))
+```
+
+Shocks to y10 account for nearly all the forecast error variance, indicating a strong dependence of y3 on y10. After the first period, y10 almost entirely explains its own forecast error variance, highlighting its self-determination in forecasting errors.
+
+
+
+##Perform the Portmanteau test for residuals on VAR model
+```{r}
+head(residuals(TMS.vec4.asVAR))
+portmanteau_test <- serial.test(TMS.vec4.asVAR)
+print(portmanteau_test)
+```
+We cannot reject Null Hypothesis which indicates no autororeelation in residuals, so there is no autocorrelation among residuals.
+
+
+# Perform the Jarque-Bera test for normality
+```{r}
+jb_test <- normality.test(TMS.vec4.asVAR)
+print(jb_test)
+```
+
+P values are bigger than 0.05, so we cannot ignore Null Hypothesis which shows normal distribution. Our residuals are normally distributed.
+
+##Forecasting out of sample
+```{r}
+TMS.testdata <- financial_data["/3/7/2022", ]
+TMS.testdata <- subset(TMS.testdata, select = c(y3, y10))
+tail(TMS.testdata)
+johan.test.eigen2.testdata <- ca.jo(TMS.testdata,
+                                 ecdet = "const",
+                                 type = "trace", 
+                                 K = 4)
+summary(johan.test.eigen2.testdata)
+```
+
+For out of sample, we need to test Johansen test again and repramatrize it. Here there is only one vector.
+
+```{r}
+TMS.vec4.fore <- 
+  predict(
+    vec2var(
+      johan.test.eigen2.testdata, 
+      r = 1),     # no of cointegrating vectors 
+    n.ahead = 20, # forecast horizon
+    ci = 0.95)    # confidence level for intervals
+
+TMS.vec4.fore$fcst$y3
+TMS.vec4.fore$fcst$y10
+
+tail(index(financial_data), 20)
+```
+Here we added forecast series and lower and upper bounds.
+
+##Adding y3 and y10  forecasts
+```{r}
+y3_forecast <- xts(TMS.vec4.fore$fcst$y3[,-4], 
+                   # we exclude the last column with CI
+                   tail(index(financial_data), 20))
+
+names(y3_forecast) <- c("y3_fore", "y3_lower", "y3_upper")
+
+y10_forecast <- xts(TMS.vec4.fore$fcst$y10[,-4],
+                   # we exclude the last column with CI
+                   tail(index(financial_data), 20))
+names(y10_forecast) <- c("y10_fore", "y10_lower", "y10_upper")
+```
+
+
+##Combinening real data and forecast data
+```{r}
+financial_data_fore <- merge(financial_data, 
+                 y3_forecast,
+                 y10_forecast)
+```
+
+##Plotting forecats
+```{r}
+plot(financial_data_fore[index(financial_data_fore) > as.Date("2022-03-07"), c("y3", "y3_fore",
+                                             "y3_lower", "y3_upper")], 
+     
+     main = "20 days forecast of instrument y3",
+     col = c("black", "blue", "red", "red"))
+
+
+plot(financial_data_fore[index(financial_data_fore) > as.Date("2022-03-07"), c("y10", "y10_fore",
+                                                                     "y10_lower", "y10_upper")], 
+     
+     main = "20 days forecast of instrument y10",
+     col = c("black", "blue", "red", "red"))
+```
+The forecasted prices for y3 and y10 over 20 time periods show that  projected observations fall within the upper and lower boundaries. In the plot, the blue line represents the forecasted values, while the other line (assumed to be black) indicates the original observations.
+
+
+##Calculating forecast errors for y3
+```{r}
+financial_data_fore$mae.y3   <-  abs(financial_data_fore$y3 - financial_data_fore$y3_fore)
+tail(financial_data_fore$mae.y3, 20)
+
+financial_data_fore$mse.y3   <-  (financial_data_fore$y3 - financial_data_fore$y3_fore) ^ 2
+tail(financial_data_fore$mse.y3, 20)
+
+financial_data_fore$mape.y3   <-  abs((financial_data_fore$y3 - financial_data_fore$y3_fore) / financial_data_fore$y3_fore)
+tail(financial_data_fore$amape.y3, 20)
+
+financial_data_fore$amape.y3   <-  abs((financial_data_fore$y3 - financial_data_fore$y3_fore) / (financial_data_fore$y3+financial_data_fore$y3_fore))
+tail(financial_data_fore$amape.y3, 20)
+```
+##Calculate means for the last 20 values for each error metric and store them in a table
+```{r}
+error_metrics_means <- data.frame(
+  Metric = c("amape.y3", "mape.y3", "mse.y3", "mae.y3"),
+  Mean = c(
+    mean(tail(financial_data_fore$amape.y3, 20), na.rm = TRUE),
+    mean(tail(financial_data_fore$mape.y3, 20), na.rm = TRUE),
+    mean(tail(financial_data_fore$mse.y3, 20), na.rm = TRUE),
+    mean(tail(financial_data_fore$mae.y3, 20), na.rm = TRUE)
+  )
+)
+```
+## Print the table
+```{r}
+print(error_metrics_means)
+```
+##Calculating forecast errors for y10
+```{r}
+financial_data_fore$mae.y10   <-  abs(financial_data_fore$y10 - financial_data_fore$y10_fore)
+tail(financial_data_fore$mae.y10, 20)
+
+financial_data_fore$mse.y10   <-  (financial_data_fore$y10 - financial_data_fore$y10_fore) ^ 2
+tail(financial_data_fore$mse.y10, 20)
+
+financial_data_fore$mape.y10   <-  abs((financial_data_fore$y10 - financial_data_fore$y10_fore) / financial_data_fore$y10_fore)
+tail(financial_data_fore$mape.y10, 20)
+
+financial_data_fore$amape.y10   <-  abs((financial_data_fore$y10 - financial_data_fore$y10_fore) / (financial_data_fore$y10+financial_data_fore$y10_fore))
+tail(financial_data_fore$amape.y10, 20)
+```
+
+##Calculate means for the last 20 values for each error metric and store them in a table
+```{r}
+error_metrics_means <- data.frame(
+  Metric = c("amape.y10", "mape.y10", "mse.y10", "mae.y10"),
+  Mean = c(
+    mean(tail(financial_data_fore$amape.y10, 20), na.rm = TRUE),
+    mean(tail(financial_data_fore$mape.y10, 20), na.rm = TRUE),
+    mean(tail(financial_data_fore$mse.y10, 20), na.rm = TRUE),
+    mean(tail(financial_data_fore$mae.y10, 20), na.rm = TRUE)
+  )
+)
+```
+
+
+##Print the table
+```{r}
+print(error_metrics_means)
+```
+
+Here we can see using VECM for forecasting y10 give lower error compared to y3.
+
+
+
+#Arima modelling
+```{r}
+head(financial_data)
+str(financial_data)
+tail(financial_data)
+
+TMS.arimapart <- subset(financial_data, select = c(y3, y10, dy3, dy10))
+plot(TMS.arimapart, 
+     # plot data in two panels (each column separately)
+     multi.panel = 2,
+     main = "Original and differenced data",
+     col = c("darkgreen", "darkblue"),
+     major.ticks = "years", 
+     grid.ticks.on = "years",
+     grid.ticks.lty = 3,
+     yaxis.same = FALSE,
+     cex = .6, lwd = 1)
+```
+
+
+
+##Box Jenkins Procedure for y3
+```{r}
+par(mfrow = c(2, 1)) 
+acf(TMS.arimapart$dy3,
+    lag.max = 36, # max lag for ACF
+    ylim = c(-0.5, 0.5),   # limits for the y axis - we give c(min, max)
+    lwd = 5,               # line width
+    col = "dark green",
+    na.action = na.pass)   # do not stop if there are missing values in the data
+pacf(TMS.arimapart$dy3, 
+     lag.max = 36, 
+     ylim = c(-0.5, 0.5),   # limits for the y axis - we give c(min, max)
+     lwd = 5, col = "dark green",
+     na.action = na.pass)
+```
+
+For y3, ACF values are significant till 10th lag and PACF values are significant till 2.
+
+
+##Box Jenkins procedure for y10
+```{r}
+par(mfrow = c(2, 1)) 
+acf(TMS.arimapart$dy10,
+    lag.max = 36, # max lag for ACF
+    ylim = c(-0.5, 0.5),   # limits for the y axis - we give c(min, max)
+    lwd = 5,               # line width
+    col = "dark green",
+    na.action = na.pass)   # do not stop if there are missing values in the data
+pacf(TMS.arimapart$dy10, 
+     lag.max = 36, 
+     lwd = 5, col = "dark green",
+     na.action = na.pass)
+par(mfrow = c(1, 1))
+```
+
+For y10, ACF values till 10th lag and PACF values till 3rd lag are significant.
+
+
+##Checking models1 for y3
+```{r}
+arima111 <- Arima(TMS.arimapart$y3,  # variable
+                  order = c(1, 1, 1)  # (p,d,q) parameters
+)
+arima111
+coeftest(arima111) #shows whether coefficenta are signifant or not
+summary(arima111) 
+arima111_2 <- Arima(TMS.arimapart$y3,  # variable
+                    order = c(1, 1, 1),  # (p,d,q) parameters
+                    include.constant = TRUE)  # including a constant
+arima111_2
+coeftest(arima111_2)
+#drift is not significant we ignore it.
+```
+
+
+##Checking models2 for y3
+```{r}
+arima112 <- Arima(TMS.arimapart$y3, # variable
+                   order = c(1,1,2 ))
+arima112
+
+coeftest(arima112)
+arima112_2 <- Arima(TMS.arimapart$y3,  # variable
+                    order = c(1, 1, 2),  # (p,d,q) parameters
+                    include.constant = TRUE)  # including a constant
+arima112_2
+coeftest(arima112_2)
+#drift is not significant we ignore it.
+```
+
+It has lower information criteria and all of coefficents are significant. At least, it is better than ARIMA(1,1,1).
+
+#Checking models3 for y3
+```{r}
+arima211 <- Arima(TMS.arimapart$y3,  # variable
+                  order = c(2, 1, 1)  # (p,d,q) parameters
+)
+arima211
+coeftest(arima211)
+arima211_2 <- Arima(TMS.arimapart$y3,  # variable
+                    order = c(2, 1, 1),  # (p,d,q) parameters
+                    include.constant = TRUE)  # including a constant
+arima211_2
+coeftest(arima211_2)
+# drift is not significant and we ignore
+```
+
+Its information criteria is higher and some of coefficents are not significant. Still Arima(1,1,2) is best choice.
+
+
+##Checking models4 for y3
+```{r}
+arima113 <- Arima(TMS.arimapart$y3,  # variable
+                  order = c(1, 1, 3)  # (p,d,q) parameters
+)
+arima113
+coeftest(arima113)
+arima113_2 <- Arima(TMS.arimapart$y3,  # variable
+                    order = c(1, 1, 3),  # (p,d,q) parameters
+                    include.constant = TRUE)  # including a constant
+arima113_2
+coeftest(arima113_2)
+# drift is not significant and we ignore it
+```
+
+Here Information criteria is lower than our previous last choice but some of coefficents are non-significant. For goodness-of-fit, I choose this model.
+
+
+#Checking models1 for y10
+```{r}
+y10_arima212 <- Arima(TMS.arimapart$y3,  # variable
+                  order = c(2, 1, 2)  # (p,d,q) parameters
+)
+y10_arima212
+coeftest(y10_arima212)
+y10_arima212_2 <- Arima(TMS.arimapart$y3,  # variable
+                    order = c(2, 1, 2),  # (p,d,q) parameters
+                    include.constant = TRUE)  # including a constant
+y10_arima212_2
+coeftest(y10_arima212_2)
+ #We ignore drift
+```
+
+
+##Checking models2 for y10
+```{r}
+y10_arima313 <- Arima(TMS.arimapart$y3,  # variable
+                      order = c(3, 1, 3)  # (p,d,q) parameters
+)
+y10_arima313
+coeftest(y10_arima313)
+summary(y10_arima313)
+#It is better than previous estimation since all coefficent are significant and It has lower information criteria.
+```
+
+It is better than previous estimation since all coefficent are significant and It has lower information criteria.
+
+##Checking models3 for y10
+```{r}
+y10_arima314 <- Arima(TMS.arimapart$y3,  # variable
+                      order = c(3, 1, 4)  # (p,d,q) parameters
+)
+y10_arima314
+coeftest(y10_arima314)
+summary(y10_arima314)
+```
+
+Arima(3,1,3) is better option because of all coefficents are significant and lower information criteria. After multiple times model estimation, my choice is ARIMA(1,1,3) for y3 and ARIMA(3,1,3) for y10.
+
+#Let's use this beautiful code taking into account of only information criteria.
+```{r}
+arima.best.AIC <- 
+  auto.arima(TMS.arimapart$y3,
+             d = 1,             # parameter d of ARIMA model
+             max.p = 6,         # Maximum value of p
+             max.q = 6,         # Maximum value of q
+             max.order = 12,    # maximum p+q
+             start.p = 1,       # Starting value of p in stepwise procedure
+             start.q = 1,       # Starting value of q in stepwise procedure
+             ic = "aic",        # Information criterion to be used in model selection.
+             stepwise = FALSE,  # if FALSE considers all models
+             allowdrift = TRUE, # include a constant
+             trace = TRUE)      # show summary of all models considered
+coeftest(arima.best.AIC)
+```
+It has lowest information criteria but coefficents are not significant.
+
+
+```{r}
+y10_arima.best.AIC <- auto.arima(TMS.arimapart$y10,
+                                 d = 1,             # parameter d of ARIMA model
+                                 max.p = 6,         # Maximum value of p
+                                 max.q = 6,         # Maximum value of q
+                                 max.order = 12,    # maximum p+q
+                                 start.p = 1,       # Starting value of p in stepwise procedure
+                                 start.q = 1,       # Starting value of q in stepwise procedure
+                                 ic = "aic",        # Information criterion to be used in model selection.
+                                 stepwise = FALSE,  # if FALSE considers all models
+                                 allowdrift = TRUE, # include a constant
+                                 trace = TRUE)      # show summary of all models considered
+coeftest(y10_arima.best.AIC)
+```
+It has lowest information criteria and all of the coefficents are significant. For y10, I will use ARIMA(3,1,2) and for y3, I will use ARIMA(1,1,2)
+
+
+#Model Diagnostics for y3
+#Plotting residuals
+```{r}
+y3_arima <- arima113
+plot(resid(y3_arima))
+
+tibble(
+  date = index(TMS.arimapart),
+  resid = arima111 %>% resid() %>% as.numeric()
+) %>%
+  ggplot(aes(date, resid)) +
+  geom_line(col = "royalblue3") +
+  theme_bw()
+```
+
+
